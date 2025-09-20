@@ -272,15 +272,23 @@ async def my_event_handler(event):
             # Если сообщение содержит медиа
             if event.message.media:
                 if isinstance(event.message.media, MessageMediaWebPage):
-                    # Для MessageMediaWebPage отправляем только ссылку, не добавляем её в updated_text
-                    webpage_url = event.message.media.webpage.url
-                    await client.send_message(destination_channel_id,"\n" + webpage_url)
+                    webpage_url = getattr(event.message.media.webpage, "url", "") or ""
+
+                    # если updated_text уже содержит либо сам webpage_url, либо new_link — не дублируем
+                    if updated_text and (webpage_url in updated_text or new_link in updated_text):
+                        text_to_send = updated_text
+                    else:
+                        # если текста нет — просто отправляем ссылку; иначе — текст + ссылка
+                        text_to_send = (updated_text + "\n" + webpage_url) if updated_text else webpage_url
+
+                    await client.send_message(destination_channel_id, text_to_send)
                 else:
-                    # Отправка обычного медиа
-                    await client.send_file(destination_channel_id, caption=updated_text)
-            else: 
-                # Отправка текста, если нет медиа
-                await client.send_message(destination_channel_id)
+                    # Отправляем файл с подписью (если есть текст)
+                    await client.send_file(destination_channel_id, event.message.media, caption=updated_text or None)
+            else:
+                # Только текст
+                await client.send_message(destination_channel_id, updated_text)
+
 
             logger.info(f"Сообщение успешно переслано из канала {event.chat_id} в канал {destination_channel_id}")
         else:

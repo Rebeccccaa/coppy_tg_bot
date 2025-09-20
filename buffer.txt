@@ -1,15 +1,48 @@
-def replace_link(text, new_link):
-    logger.debug(f"Заменяем ссылки: {text!r}")
-    if not text:
-        return text
+@client.on(events.NewMessage(chats=list(channels)))
+async def my_event_handler(event):
+    global auto_forward_enabled
 
-    # 1) Заменяем markdown-ссылки вида [text](http...)
-    markdown_url_pattern = re.compile(r'\[([^\]]+)\]\(https?://[^\)]+\)', flags=re.IGNORECASE)
-    text = markdown_url_pattern.sub(r'[\1](' + new_link + ')', text)
+    # Проверка состояния авто-пересылки
+    if not auto_forward_enabled:
+        return
 
-    # 2) Заменяем "голые" URL (но избегаем URL, которые уже находятся внутри markdown - отсюда (?<!\())
-    plain_url_pattern = re.compile(r'(?<!\()\bhttps?://[^\s\]\)]+', flags=re.IGNORECASE)
-    text = plain_url_pattern.sub(new_link, text)
+    logger.info(f"Получено сообщение из канала: {event.chat_id}, Текст: {event.message.text}")
 
-    logger.debug(f"После замены ссылок: {text!r}")
-    return text
+    try:
+        original_text = event.message.text
+        updated_text = replace_link(replace_at_word(original_text, new_username), new_link)
+
+        # Получаем целевой канал по соответствию
+        destination_channel_id = channel_mapping.get(event.chat_id)
+
+        if destination_channel_id is not None:
+            logger.info(f"Пересылаем сообщение в канал {destination_channel_id}")
+
+            # Если сообщение содержит медиа
+            if event.message.media:
+                if isinstance(event.message.media, MessageMediaWebPage):
+                    webpage_url = getattr(event.message.media.webpage, "url", "") or ""
+
+                    # если updated_text уже содержит либо сам webpage_url, либо new_link — не дублируем
+                    if updated_text and (webpage_url in updated_text or new_link in updated_text):
+                        text_to_send = updated_text
+                    else:
+                        # если текста нет — просто отправляем ссылку; иначе — текст + ссылка
+                        text_to_send = (updated_text + "\n" + webpage_url) if updated_text else webpage_url
+
+                    await client.send_message(destination_channel_id, text_to_send)
+                else:
+                    # Отправляем файл с подписью (если есть текст)
+                    await client.send_file(destination_channel_id, event.message.media, caption=updated_text or None)
+            else:
+                # Только текст
+                await client.send_message(destination_channel_id, updated_text)
+
+
+            logger.info(f"Сообщение успешно переслано из канала {event.chat_id} в канал {destination_channel_id}")
+        else:
+            logger.info(f"Не найдено соответствие для канала {event.chat_id}")
+
+    except Exception as e:
+        logger.error(f"Ошибка при пересылке сообщения из канала {event.chat_id}: {str(e)}")
+
