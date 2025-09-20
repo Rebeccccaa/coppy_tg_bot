@@ -918,9 +918,9 @@ async def send_last_messages_handler(message: types.Message):
 
     await send_last_messages(source_channel_id, limit)
     if limit is None:
-        await message.reply("Все посты отправлены!")
+        await message.reply("Все сообщения отправлены!")
     else:
-        await message.reply(f"{limit} последних постов отправлены!")
+        await message.reply(f"{limit-1} последних сообщений отправлены!")
 
 async def send_last_messages(source_channel_id=None, limit=None):
     if source_channel_id is not None:
@@ -928,45 +928,29 @@ async def send_last_messages(source_channel_id=None, limit=None):
         if destination_channel_id is None:
             return
         chat = await client.get_entity(source_channel_id)
-        # Получаем много сообщений, чтобы точно получить нужное количество постов
-        messages = await client.get_messages(chat, limit=limit * 10)
+        messages = await client.get_messages(chat, limit=limit)
     else:
         messages = []
         for source_channel_id, destination_channel_id in channel_mapping.items():
             chat = await client.get_entity(source_channel_id)
-            channel_messages = await client.get_messages(chat, limit=limit * 10)
+            channel_messages = await client.get_messages(chat, limit=limit)
             messages.extend(channel_messages)
 
-    # Сортируем сообщения по дате (самые новые первыми)
-        # Получаем только последние 'limit' сообщений
-        messages = await client.get_messages(chat, limit=limit)
+    messages = sorted(messages, key=lambda x: x.date)
 
-# Сортируем сообщения от старых к новым (с reverse=False, чтобы старые шли первыми)
-        messages = sorted(messages, key=lambda x: x.date, reverse=False)
-
-# Если нужно, можем взять только первые 'limit' сообщений
-        messages = messages[:limit]
-
-
-    # Группируем сообщения в посты
-    posts = {}
+    grouped_messages = {}
     for message in messages:
         if message.action is None:
             if message.grouped_id:
-                if message.grouped_id not in posts:
-                    posts[message.grouped_id] = [message]
+                if message.grouped_id not in grouped_messages:
+                    grouped_messages[message.grouped_id] = [message]
                 else:
-                    posts[message.grouped_id].append(message)
+                    grouped_messages[message.grouped_id].append(message)
             else:
-                posts[message.id] = [message]
-
-    # Берем только нужное количество постов (в том же порядке, что и в канале)
-    if limit is not None:
-        post_items = list(posts.items())[:limit]
-        posts = dict(post_items)
+                grouped_messages[message.id] = [message]
 
     for destination_channel_id in destination_channels:
-        for message_group in posts.values():
+        for message_group in grouped_messages.values():
             if len(message_group) > 1 and message_group[0].grouped_id:
                 media_list = [msg.media for msg in message_group]
                 caption = "\n".join([replace_link(replace_at_word(msg.text, new_username), new_link) for msg in message_group if msg.text])

@@ -80,17 +80,19 @@ def save_channels():
 
 
 def replace_link(text, new_link):
-    # Ищем ссылки с Markdown форматированием [text](http://url)
+    logger.debug(f"Заменяем ссылки: {text}")
     markdown_url_pattern = re.compile(r'\[([^\]]+)\]\(http[s]?://[^\)]+\)')
-    # Заменяем URL, сохраняя оригинальный текст ссылки
-    return markdown_url_pattern.sub(r'[\1](' + new_link + ')', text)
-
-
+    updated_text = markdown_url_pattern.sub(r'[\1](' + new_link + ')', text)
+    logger.debug(f"После замены ссылок: {updated_text}")
+    return updated_text
 
 def replace_at_word(text, new_word):
     if not text:
         return text
-    return re.sub(r'@(\w+)', new_word, text)
+    logger.debug(f"Заменяем юзернеймы: {text}")
+    updated_text = re.sub(r'@(\w+)', new_word, text)
+    logger.debug(f"После замены юзернеймов: {updated_text}")
+    return updated_text
 
 
 
@@ -251,7 +253,54 @@ async def get_destination_channel_info(destination_channel_id):
     else:
         return f"Канал с ID {destination_channel_id}", destination_channel_id
 
+
+from telethon.tl.types import MessageMediaWebPage
+
 @client.on(events.NewMessage(chats=list(channels)))
+async def my_event_handler(event):
+    global auto_forward_enabled
+
+    # Проверка состояния авто-пересылки
+    if not auto_forward_enabled:
+        return
+
+    logger.info(f"Получено сообщение из канала: {event.chat_id}, Текст: {event.message.text}")
+
+    try:
+        original_text = event.message.text
+        updated_text = replace_link(replace_at_word(original_text, new_username), new_link)
+
+        # Получаем целевой канал по соответствию
+        destination_channel_id = channel_mapping.get(event.chat_id)
+
+        if destination_channel_id is not None:
+            logger.info(f"Пересылаем сообщение в канал {destination_channel_id}")
+
+            # Если сообщение содержит медиа
+            if event.message.media:
+                if isinstance(event.message.media, MessageMediaWebPage):
+                    # Для MessageMediaWebPage отправляем только ссылку, не добавляем её в updated_text
+                    webpage_url = event.message.media.webpage.url
+                    await client.send_message(destination_channel_id,"\n" + webpage_url)
+                else:
+                    # Отправка обычного медиа
+                    await client.send_file(destination_channel_id, caption=updated_text)
+            else: 
+                # Отправка текста, если нет медиа
+                await client.send_message(destination_channel_id)
+
+            logger.info(f"Сообщение успешно переслано из канала {event.chat_id} в канал {destination_channel_id}")
+        else:
+            logger.info(f"Не найдено соответствие для канала {event.chat_id}")
+
+    except Exception as e:
+        logger.error(f"Ошибка при пересылке сообщения из канала {event.chat_id}: {str(e)}")
+
+
+
+
+
+    
 async def my_event_handler(event):
     try:
         media_type = type(event.message.media).__name__ if event.message and event.message.media else None
@@ -449,6 +498,7 @@ async def rewrite_text_with_chatgpt(text, openai_api_key):
 
 
 
+auto_forward_enabled = True
 
 
 
@@ -467,12 +517,92 @@ def create_menu_keyboard():
     keyboard.add(InlineKeyboardButton("Удалить соответствие каналов", callback_data='remove_mapping'))
     keyboard.add(InlineKeyboardButton("Отправить последние сообщения", callback_data='last_messages'))
     keyboard.add(InlineKeyboardButton("Перезагрузить бота", callback_data='restart_bot'))
+    
 
     # Меняем текст кнопки "Модерация" в зависимости от статуса модерации
     moderation_text = "Модерация: выкл" if moderation_active else "Модерация: вкл"
     keyboard.add(InlineKeyboardButton(moderation_text, callback_data='toggle_moderation'))
+    auto_forward_text = "Авто-пересылка: включена" if auto_forward_enabled else "Авто-пересылка: выключена"
+    keyboard.add(InlineKeyboardButton(auto_forward_text, callback_data='toggle_auto_forward'))
 
     return keyboard
+
+@dp.callback_query_handler(lambda c: c.data == 'toggle_auto_forward')
+async def toggle_auto_forward(callback_query: types.CallbackQuery):
+    global auto_forward_enabled
+    global toggle_auto_forward
+
+    # Toggle the auto-forwarding state
+    auto_forward_enabled = not auto_forward_enabled
+
+    # Send the updated status message
+    status_text = "Автоматическое пересылание включено" if auto_forward_enabled else "Автоматическое пересылание выключено"
+    await bot.answer_callback_query(callback_query.id, status_text)
+
+    # Update the menu with the correct button text
+    keyboard = create_menu_keyboard()
+    await bot.edit_message_reply_markup(callback_query.message.chat.id, callback_query.message.message_id, reply_markup=keyboard)
+
+
+# Handle new messages for auto-forwarding
+
+@client.on(events.NewMessage(chats=list(channels)))
+async def my_event_handler(event):
+    global auto_forward_enabled
+
+    # Проверка состояния авто-пересылки
+    if not auto_forward_enabled:
+        return
+
+    logger.info(f"Получено сообщение из канала: {event.chat_id}, Текст: {event.message.text}")
+
+    try:
+        original_text = event.message.text
+        updated_text = replace_link(replace_at_word(original_text, new_username), new_link)
+
+        # Получаем целевой канал по соответствию
+        destination_channel_id = channel_mapping.get(event.chat_id)
+
+        if destination_channel_id is not None:
+            logger.info(f"Пересылаем сообщение в канал {destination_channel_id}")
+            if event.message.media:
+                await client.send_file(destination_channel_id, event.message.media, caption=updated_text)
+            else:
+                await client.send_message(destination_channel_id, updated_text)
+
+            logger.info(f"Сообщение успешно переслано из канала {event.chat_id} в канал {destination_channel_id}")
+        else:
+            logger.info(f"Не найдено соответствие для канала {event.chat_id}")
+
+    except Exception as e:
+        logger.error(f"Ошибка при пересылке сообщения из канала {event.chat_id}: {str(e)}")
+    
+async def my_event_handler(event):
+    global auto_forward_enabled
+
+    # Skip if auto-forwarding is disabled
+    if not auto_forward_enabled:
+        return
+
+    try:
+        original_text = event.message.text
+        updated_text = replace_link(replace_at_word(original_text, new_username), new_link)
+
+        # Get the destination channel based on the mapping
+        destination_channel_id = channel_mapping.get(event.chat_id)
+
+        if destination_channel_id is not None:
+            if event.message.media:
+                await client.send_file(destination_channel_id, event.message.media, caption=updated_text)
+            else:
+                await client.send_message(destination_channel_id, updated_text)
+
+            logger.info(f"Сообщение переслано из канала {event.chat_id} в канал {destination_channel_id}")
+        else:
+            logger.info(f"Нет соответствующего канала для пересылки сообщения из канала {event.chat_id}")
+
+    except Exception as e:
+        logger.error(f"Ошибка при пересылке сообщения из канала {event.chat_id}: {str(e)}")
 
 
 
@@ -918,9 +1048,9 @@ async def send_last_messages_handler(message: types.Message):
 
     await send_last_messages(source_channel_id, limit)
     if limit is None:
-        await message.reply("Все посты отправлены!")
+        await message.reply("Все сообщения отправлены!")
     else:
-        await message.reply(f"{limit} последних постов отправлены!")
+        await message.reply(f"{limit-1} последних сообщений отправлены!")
 
 async def send_last_messages(source_channel_id=None, limit=None):
     if source_channel_id is not None:
@@ -928,45 +1058,29 @@ async def send_last_messages(source_channel_id=None, limit=None):
         if destination_channel_id is None:
             return
         chat = await client.get_entity(source_channel_id)
-        # Получаем много сообщений, чтобы точно получить нужное количество постов
-        messages = await client.get_messages(chat, limit=limit * 10)
+        messages = await client.get_messages(chat, limit=limit)
     else:
         messages = []
         for source_channel_id, destination_channel_id in channel_mapping.items():
             chat = await client.get_entity(source_channel_id)
-            channel_messages = await client.get_messages(chat, limit=limit * 10)
+            channel_messages = await client.get_messages(chat, limit=limit)
             messages.extend(channel_messages)
 
-    # Сортируем сообщения по дате (самые новые первыми)
-        # Получаем только последние 'limit' сообщений
-        messages = await client.get_messages(chat, limit=limit)
+    messages = sorted(messages, key=lambda x: x.date)
 
-# Сортируем сообщения от старых к новым (с reverse=False, чтобы старые шли первыми)
-        messages = sorted(messages, key=lambda x: x.date, reverse=False)
-
-# Если нужно, можем взять только первые 'limit' сообщений
-        messages = messages[:limit]
-
-
-    # Группируем сообщения в посты
-    posts = {}
+    grouped_messages = {}
     for message in messages:
         if message.action is None:
             if message.grouped_id:
-                if message.grouped_id not in posts:
-                    posts[message.grouped_id] = [message]
+                if message.grouped_id not in grouped_messages:
+                    grouped_messages[message.grouped_id] = [message]
                 else:
-                    posts[message.grouped_id].append(message)
+                    grouped_messages[message.grouped_id].append(message)
             else:
-                posts[message.id] = [message]
-
-    # Берем только нужное количество постов (в том же порядке, что и в канале)
-    if limit is not None:
-        post_items = list(posts.items())[:limit]
-        posts = dict(post_items)
+                grouped_messages[message.id] = [message]
 
     for destination_channel_id in destination_channels:
-        for message_group in posts.values():
+        for message_group in grouped_messages.values():
             if len(message_group) > 1 and message_group[0].grouped_id:
                 media_list = [msg.media for msg in message_group]
                 caption = "\n".join([replace_link(replace_at_word(msg.text, new_username), new_link) for msg in message_group if msg.text])
