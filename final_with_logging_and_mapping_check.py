@@ -180,13 +180,6 @@ async def process_send(callback_query: types.CallbackQuery):
 
 
 
-
-
-
-
-
-
-
 @dp.callback_query_handler(lambda c: c.data.startswith('decline_'))
 async def process_decline(callback_query: types.CallbackQuery):
     message_id = int(callback_query.data.split('_')[1])
