@@ -1,0 +1,24 @@
+[
+  {
+    "source_id": -1002958989151,
+    "target_id": -1002999242172,
+    "source_name": "отправитель",
+    "target_name": "получатель",
+    "white_list": ["https://t.me/sssendddd", "https://t.me/boost/sssendddd", "https://example.com"],
+    "link_mappings": [
+      {"src": "https://t.me/sssendddd", "tgt": "https://t.me/ttttakeeee"},
+      {"src": "https://t.me/boost/sssendddd", "tgt": "https://t.me/boost/ttttakeeee"}
+    ]
+  },
+  {
+    "source_id": -1003022588934,
+    "target_id": -1003181562197,
+    "source_name": "отправитель2",
+    "target_name": "получатель2",
+    "white_list": ["https://t.me/sssendddd2", "https://t.me/boost/sssendddd2", "https://example.com"],
+    "link_mappings": [
+      {"src": "https://t.me/sssendddd2", "tgt": "https://t.me/ttttakeeee2"},
+      {"src": "https://t.me/boost/sssendddd2", "tgt": "https://t.me/boost/ttttakeeee2"}
+    ]
+  }
+]

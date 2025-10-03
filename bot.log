@@ -1,0 +1,18 @@
+[2025-10-03 01:12:41,566] INFO: Connecting to 149.154.167.51:443/TcpFull...
+[2025-10-03 01:12:41,568] INFO: Connection to 149.154.167.51:443/TcpFull complete!
+[2025-10-03 01:13:02,173] INFO: Detected album item grouped_id=14075545458705226 msg_id=53 — waiting for Album event
+[2025-10-03 01:13:02,173] INFO: Detected album item grouped_id=14075545458705226 msg_id=54 — waiting for Album event
+[2025-10-03 01:13:02,689] INFO: Enqueued album from -1003022588934 with 2 items
+[2025-10-03 01:13:02,689] INFO: Альбом: chat=-1003022588934 group=14075545458705226 ids=[53, 54] caption=
+[2025-10-03 01:13:02,885] INFO: Forwarded album -1003022588934 -> -1003181562197 (count=2)
+[2025-10-03 01:13:18,821] INFO: Detected album item grouped_id=14075545591043506 msg_id=55 — waiting for Album event
+[2025-10-03 01:13:18,821] INFO: Detected album item grouped_id=14075545591043506 msg_id=56 — waiting for Album event
+[2025-10-03 01:13:18,821] INFO: Detected album item grouped_id=14075545591043506 msg_id=57 — waiting for Album event
+[2025-10-03 01:13:18,821] INFO: Detected album item grouped_id=14075545591043506 msg_id=58 — waiting for Album event
+[2025-10-03 01:13:18,821] INFO: Detected album item grouped_id=14075545591043506 msg_id=59 — waiting for Album event
+[2025-10-03 01:13:19,322] INFO: Enqueued album from -1003022588934 with 5 items
+[2025-10-03 01:13:19,322] INFO: Альбом: chat=-1003022588934 group=14075545591043506 ids=[55, 56, 57, 58, 59] caption=вавпвапвап
+[2025-10-03 01:13:19,600] INFO: Forwarded album -1003022588934 -> -1003181562197 (count=5)
+[2025-10-03 01:14:34,462] INFO: Disconnecting from 149.154.167.51:443/TcpFull...
+[2025-10-03 01:14:34,463] INFO: Disconnection from 149.154.167.51:443/TcpFull complete!
+[2025-10-03 01:14:34,470] INFO: Not disconnecting (already have no connection)

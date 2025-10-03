@@ -1,0 +1,4 @@
+# Список зависимостей проекта
+telethon==1.30.3
+python-dotenv
+Pillow
